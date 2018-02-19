@@ -7,7 +7,7 @@ import traceback
 
 LOG_FILE_NAME = 'output.log'
 
-REGION = 'us-west-2'
+REGION = 'us-east-2'
 
 class S3Handler:
     """S3 handler."""
@@ -45,7 +45,7 @@ class S3Handler:
         if issue:
             return error_message_dict[issue]
         else:
-            return error_message['unknown_error']
+            return error_message_dict['unknown_error']
 
     def _get_file_extension(self, file_name):
         if os.path.exists(file_name):
@@ -60,6 +60,7 @@ class S3Handler:
             # traceback.print_exc(file=sys.stdout)
             
             response_code = e.response['Error']['Code']
+            #response_code = e.response['Error']['Code']
             if response_code == '404':
                 return False
             elif response_code == '200':
@@ -90,9 +91,20 @@ class S3Handler:
 
     def listdir(self, bucket_name):
         # If bucket_name is provided, check that bucket exits.
-        
+        if self._get(bucket_name):
+            return self._error_messages('non_existent_bucket')
+
         # If bucket_name is empty then display the names of all the buckets
-        
+        if not bucket_name:
+            print(self._error_messages('bucket_name_empty'))
+            bucket_list = self.client.list_buckets()
+            print('Avaliable buckets list:')
+            for buckets in bucket_list:
+                if 'Buckets' in buckets:
+                    bucket = buckets['Buckets']
+                    if 'Name' in bucket:
+                        print('Name: %s    Date created: %s', bucket['Name'], bucket['CreationDate'])
+
         # If bucket_name is provided then display the names of all objects in the bucket
         return self._error_messages('not_implemented')
 
