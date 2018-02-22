@@ -40,6 +40,7 @@ class S3Handler:
         error_message_dict['missing_source_file'] = 'Source file cannot be found.'
         error_message_dict['non_existent_bucket'] = 'Directory does not exist.'
         error_message_dict['non_existent_object'] = 'Destination Object does not exist.'
+        error_message_dict['not_authorized_bucket'] = 'You are not authorized to access this directory'
         error_message_dict['unknown_error'] = 'Something was not correct with the request. Try again.'
 
         if issue:
@@ -60,11 +61,12 @@ class S3Handler:
             # traceback.print_exc(file=sys.stdout)
             
             response_code = e.response['Error']['Code']
-            #response_code = e.response['Error']['Code']
             if response_code == '404':
                 return False
             elif response_code == '200':
                 return True
+            #elif response_code == '403':
+                #return self._error_messages('not_authorized_bucket')
             else:
                 raise e
         if response['ResponseMetadata']['HTTPStatusCode'] == 200:
@@ -90,23 +92,30 @@ class S3Handler:
         return operation_successful
 
     def listdir(self, bucket_name):
-        # If bucket_name is provided, check that bucket exits.
-        if self._get(bucket_name):
-            return self._error_messages('non_existent_bucket')
+        result = []
 
         # If bucket_name is empty then display the names of all the buckets
         if not bucket_name:
-            print(self._error_messages('bucket_name_empty'))
             bucket_list = self.client.list_buckets()
+            buckets = bucket_list['Buckets']
             print('Avaliable buckets list:')
-            for buckets in bucket_list:
-                if 'Buckets' in buckets:
-                    bucket = buckets['Buckets']
-                    if 'Name' in bucket:
-                        print('Name: %s    Date created: %s', bucket['Name'], bucket['CreationDate'])
+            for bucket in buckets:
+                result.append(bucket['Name'])
 
+        # If bucket_name is provided, check that bucket exits.
+        else:
+            if not self._get(bucket_name):
+                return self._error_messages('non_existent_bucket')
         # If bucket_name is provided then display the names of all objects in the bucket
-        return self._error_messages('not_implemented')
+            object_list = self.client.list_objects_v2(
+                Bucket=bucket_name
+            )
+            #objects = object_list['Name']
+            print('Available objects in directory %s:' % bucket_name)
+            for obj in object_list:
+                result.append(object_list['Name'])
+
+        return ', '.join(result)
 
     def upload(self, source_file_name, bucket_name, dest_object_name=''):
         # 1. Parameter Validation
@@ -211,6 +220,8 @@ class S3Handler:
             response = self.find(file_extension, bucket_name)
         elif parts[0] == 'listdir':
             bucket_name = ''
+            if len(parts) > 1:
+                bucket_name = parts[1]
             response = self.listdir(bucket_name)
         else:
             response = "Command not recognized."
@@ -233,7 +244,7 @@ def main():
             command_string = " ".join(command_string.split())
             
             if command_string == 'exit':
-                print("Good bye!")
+                print("Goodbye!")
                 exit()
             elif command_string == 'help':
                 s3_handler.help()
