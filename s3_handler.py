@@ -121,16 +121,26 @@ class S3Handler:
         # 1. Parameter Validation
         #    - source_file_name exits in current directory
         #    - bucket_name exists
+        if not os.path.isfile(source_file_name):
+            return self._error_messages('missing_source_file')
+
+        if not self._get(bucket_name):
+            return self._error_messages('non_existent_bucket')
+
         # 2. If dest_object_name is not specified then use the source_file_name as dest_object_name
+        if dest_object_name == '':
+            dest_object_name = source_file_name
 
         # 3. SDK call
         #    - When uploading the source_file_name and add it to object's meta-data
         #    - Use self._get_file_extension() method to get the extension of the file.
+        self.client.upload_file(source_file_name, bucket_name, dest_object_name)
 
         # Success response
-        # operation_successful = ('File %s uploaded to bucket %s.' % (source_file_name, bucket_name))
+        operation_successful = ('File %s uploaded to bucket %s.' % (source_file_name, bucket_name))
 
-        return self._error_messages('not_implemented')
+        return operation_successful
+        # return self._error_messages('not_implemented')
 
 
     def download(self, dest_object_name, bucket_name, source_file_name=''):
@@ -194,9 +204,13 @@ class S3Handler:
             # source_file_name and bucket_name are compulsory; dest_object_name is optional
             # Use self._error_messages['incorrect_parameter_number'] if number of parameters is less
             # than number of compulsory parameters
-            source_file_name = ''
-            bucket_name = ''
+            if len(parts) < 3:
+                self._error_messages['incorrect_parameter_number']
+            source_file_name = parts[1]
+            bucket_name = parts[2]
             dest_object_name = ''
+            if len(parts) > 3:
+                dest_object_name = parts[3]
             response = self.upload(source_file_name, bucket_name, dest_object_name)
         elif parts[0] == 'download':
             # Figure out parameters from command_string
