@@ -1,7 +1,7 @@
 name: Kevin Singh
 eid: ks37843
 bitbucketid: singh5
-aws_region_name: <name of the aws region that you used for the assignment>
+aws_region_name: us-east-2
 comments: <Comments, if any>
 
 Cloud Computing

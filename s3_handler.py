@@ -121,7 +121,7 @@ class S3Handler:
         # 1. Parameter Validation
         #    - source_file_name exits in current directory
         #    - bucket_name exists
-        if not os.path.isfile(source_file_name):
+        if not os.path.exists(source_file_name):
             return self._error_messages('missing_source_file')
 
         if not self._get(bucket_name):
@@ -134,7 +134,8 @@ class S3Handler:
         # 3. SDK call
         #    - When uploading the source_file_name and add it to object's meta-data
         #    - Use self._get_file_extension() method to get the extension of the file.
-        self.client.upload_file(source_file_name, bucket_name, dest_object_name)
+        file_extension = self._get_file_extension(source_file_name)
+        self.client.upload_file(source_file_name, bucket_name, dest_object_name, ExtraArgs={'ContentType': file_extension[1]})
 
         # Success response
         operation_successful = ('File %s uploaded to bucket %s.' % (source_file_name, bucket_name))
@@ -205,7 +206,7 @@ class S3Handler:
             # Use self._error_messages['incorrect_parameter_number'] if number of parameters is less
             # than number of compulsory parameters
             if len(parts) < 3:
-                self._error_messages['incorrect_parameter_number']
+                return self._error_messages('incorrect_parameter_number')
             source_file_name = parts[1]
             bucket_name = parts[2]
             dest_object_name = ''
