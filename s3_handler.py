@@ -1,9 +1,12 @@
+from __future__ import print_function
 import ast
 import boto3
 import logging
 import os
 import sys
 import traceback
+import time
+# xxxpylint: disable=print-statement
 
 LOG_FILE_NAME = 'output.log'
 
@@ -65,8 +68,23 @@ class S3Handler:
                 return False
             elif response_code == '200':
                 return True
-            #elif response_code == '403':
-                #return self._error_messages('not_authorized_bucket')
+            else:
+                raise e
+        if response['ResponseMetadata']['HTTPStatusCode'] == 200:
+            return True
+        else:
+            return False
+
+    def _get_object(self, bucket_name, object_name):
+        response = ''
+        try:
+            response = self.client.head_object(Bucket=bucket_name, Key=object_name)
+        except Exception as e:
+            response_code = e.response['Error']['Code']
+            if response_code == '404':
+                return False
+            elif response_code == '200':
+                return True
             else:
                 raise e
         if response['ResponseMetadata']['HTTPStatusCode'] == 200:
@@ -135,13 +153,17 @@ class S3Handler:
         #    - When uploading the source_file_name and add it to object's meta-data
         #    - Use self._get_file_extension() method to get the extension of the file.
         file_extension = self._get_file_extension(source_file_name)
-        self.client.upload_file(source_file_name, bucket_name, dest_object_name, ExtraArgs={'ContentType': file_extension[1]})
+        action = self.client.upload_file(source_file_name, bucket_name, dest_object_name, ExtraArgs={'ContentType': file_extension[1]})
+
+        try:
+            action
+        except Exception as e:
+            return ("Failed to upload %s to %s: %s" % (source_file_name, '/'.join([bucket_name, dest_object_name]), e))
 
         # Success response
         operation_successful = ('File %s uploaded to bucket %s.' % (source_file_name, bucket_name))
 
         return operation_successful
-        # return self._error_messages('not_implemented')
 
 
     def download(self, dest_object_name, bucket_name, source_file_name=''):
@@ -150,13 +172,32 @@ class S3Handler:
         # with following format: <source_file_name.bak.current_time_stamp_in_millis>
         
         # Parameter Validation
+        if not self._get(bucket_name):                          #check for directory
+            return self._error_messages('non_existent_bucket')
+        if not self._get_object(bucket_name, dest_object_name):      #check for object
+            return self._error_messages('non_existent_object')
+
+        if source_file_name == '':
+            source_file_name = dest_object_name 
+
+        #create backup file
+        if os.path.exists(source_file_name):
+            time_in_millis = int(round(time.time() * 1000))
+            source_file_name = source_file_name + '.bak.' + str(time_in_millis)
+            print(source_file_name)
         
         # SDK Call
+        action = self.client.download_file(bucket_name, dest_object_name, source_file_name)
+
+        try:
+            action
+        except Exception as e:
+            return ("Failed to download %s to %s: %s" % (dest_object_name, '/'.join([bucket_name, source_file_name]), e))
 
         # Success response
-        # operation_successful = ('Object %s downloaded from bucket %s.' % (dest_object_name, bucket_name))
+        operation_successful = ('Object %s downloaded from bucket %s.' % (dest_object_name, bucket_name))
 
-        return self._error_messages('not_implemented')
+        return operation_successful
 
 
     def delete(self, dest_object_name, bucket_name):
@@ -218,9 +259,13 @@ class S3Handler:
             # dest_object_name and bucket_name are compulsory; source_file_name is optional
             # Use self._error_messages['incorrect_parameter_number'] if number of parameters is less
             # than number of compulsory parameters
+            if len(parts) < 3:
+                return self._error_messages('incorrect_parameter_number')
+            dest_object_name = parts[1]
+            bucket_name = parts[2]
             source_file_name = ''
-            bucket_name = ''
-            dest_object_name = ''
+            if len(parts) > 3:
+                source_file_name = parts[3]
             response = self.download(dest_object_name, bucket_name, source_file_name)
         elif parts[0] == 'delete':
             dest_object_name = ''
