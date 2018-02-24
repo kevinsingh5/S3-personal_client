@@ -201,11 +201,26 @@ class S3Handler:
 
 
     def delete(self, dest_object_name, bucket_name):
+        # Parameter Validation
+        if not self._get(bucket_name):                              #check for directory
+            return self._error_messages('non_existent_bucket')
+        if not self._get_object(bucket_name, dest_object_name):     #check for object
+            return self._error_messages('non_existent_object')
+
+        action = self.client.delete_object(
+            Bucket=bucket_name,
+            Key=dest_object_name
+        )
+
+        try:
+            action
+        except Exception as e:
+            return ("Failed to delete %s from directory %s: %s" % (dest_object_name, bucket_name, e))
         
         # Success response
-        # operation_successful = ('Object %s deleted from bucket %s.' % (dest_object_name, bucket_name))
+        operation_successful = ('Object %s deleted from bucket %s.' % (dest_object_name, bucket_name))
         
-        return self._error_messages('not_implemented')
+        return operation_successful
 
 
     def deletedir(self, bucket_name):
@@ -268,8 +283,10 @@ class S3Handler:
                 source_file_name = parts[3]
             response = self.download(dest_object_name, bucket_name, source_file_name)
         elif parts[0] == 'delete':
-            dest_object_name = ''
-            bucket_name = ''
+            if len(parts) < 3:
+                return self._error_messages('incorrect_parameter_number')
+            dest_object_name = parts[1]
+            bucket_name = parts[2]
             response = self.delete(dest_object_name, bucket_name)
         elif parts[0] == 'deletedir':
             bucket_name = ''
