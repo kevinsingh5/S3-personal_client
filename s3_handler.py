@@ -265,8 +265,15 @@ class S3Handler:
 
             print('Found the following objects in bucket %s: ' % bucket_name)
             for obj in objects:
-                if(obj['Key'].endswith(file_extension)):
-                    result.append(obj['Key'])
+                object_name = obj['Key']
+                obj_meta = self.client.head_object(
+                    Bucket=bucket_name,
+                    Key=object_name
+                )
+
+                meta = obj_meta['ContentType']
+                if meta.endswith(file_extension):
+                    result.append(object_name)
 
         # If bucket_name is empty then search all buckets
         else:
@@ -282,23 +289,20 @@ class S3Handler:
                 )
                 
                 objects = object_list['Contents']
-                
-                print('Found the following objects in bucket %s: ' % bucket_name)
                 for obj in objects:
-                    if(obj['Key'].endswith(file_extension)):
-                        result.append(obj['Key'])
+                    object_name = obj['Key']
+                    obj_meta = self.client.head_object(
+                        Bucket=bucket_name,
+                        Key=object_name
+                    )
 
+                    meta = obj_meta['ContentType']
+                    if meta.endswith(file_extension):
+                        result.append(object_name)
+                    
+        if len(result) == 0:
+            return ("No results found")
 
-
-
-
- #               if(bucket['Name'].endswith(file_extension)):
-  #                  result.append(bucket['Name'])
-
-
-        
-
-        
         return ', '.join(result)
 
 
