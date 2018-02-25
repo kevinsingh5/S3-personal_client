@@ -250,13 +250,56 @@ class S3Handler:
 
     def find(self, file_extension, bucket_name=''):
         # Return object names that match the given file extension
+        if bucket_name != '':
+            if not self._get(bucket_name):          #check for directory
+                return self._error_messages('non_existent_bucket')
 
         # If bucket_name is specified then search for objects in that bucket.
+        result = []
+        if bucket_name:
+            object_list = self.client.list_objects_v2(
+                Bucket=bucket_name
+            )
+            
+            objects = object_list['Contents']
+
+            print('Found the following objects in bucket %s: ' % bucket_name)
+            for obj in objects:
+                if(obj['Key'].endswith(file_extension)):
+                    result.append(obj['Key'])
+
         # If bucket_name is empty then search all buckets
+        else:
+            bucket_list = self.client.list_buckets()
+
+            buckets = bucket_list['Buckets']
+            print('Found the following objects in all buckets:')
+
+            for bucket in buckets:
+                bucket_name = bucket['Name']
+                object_list = self.client.list_objects_v2(
+                    Bucket=bucket_name
+                )
+                
+                objects = object_list['Contents']
+                
+                print('Found the following objects in bucket %s: ' % bucket_name)
+                for obj in objects:
+                    if(obj['Key'].endswith(file_extension)):
+                        result.append(obj['Key'])
+
+
+
+
+
+ #               if(bucket['Name'].endswith(file_extension)):
+  #                  result.append(bucket['Name'])
+
+
         
 
         
-        return self._error_messages('not_implemented')
+        return ', '.join(result)
 
 
     def dispatch(self, command_string):
@@ -310,8 +353,12 @@ class S3Handler:
             bucket_name = parts[1]
             response = self.deletedir(bucket_name)
         elif parts[0] == 'find':
-            file_extension = ''
+            if len(parts) < 2:
+                return self._error_messages('incorrect_parameter_number')
+            file_extension = parts[1]
             bucket_name = ''
+            if len(parts) > 2:
+                bucket_name = parts[2]
             response = self.find(file_extension, bucket_name)
         elif parts[0] == 'listdir':
             bucket_name = ''
