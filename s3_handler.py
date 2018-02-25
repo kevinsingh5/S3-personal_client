@@ -1,4 +1,5 @@
 from __future__ import print_function
+from botocore.exceptions import ClientError
 import ast
 import boto3
 import logging
@@ -40,9 +41,10 @@ class S3Handler:
         error_message_dict['not_implemented'] = 'Functionality not implemented yet!'
         error_message_dict['bucket_name_exists'] = 'Directory already exists.'
         error_message_dict['bucket_name_empty'] = 'Directory name cannot be empty.'
+        error_message_dict['bucket_not_empty'] = 'Directory is not empty. Delete objects before proceeding.'
         error_message_dict['missing_source_file'] = 'Source file cannot be found.'
         error_message_dict['non_existent_bucket'] = 'Directory does not exist.'
-        error_message_dict['non_existent_object'] = 'Destination Object does not exist.'
+        error_message_dict['non_existent_object'] = 'Destination object does not exist.'
         error_message_dict['not_authorized_bucket'] = 'You are not authorized to access this directory'
         error_message_dict['unknown_error'] = 'Something was not correct with the request. Try again.'
 
@@ -184,7 +186,6 @@ class S3Handler:
         if os.path.exists(source_file_name):
             time_in_millis = int(round(time.time() * 1000))
             source_file_name = source_file_name + '.bak.' + str(time_in_millis)
-            print(source_file_name)
         
         # SDK Call
         action = self.client.download_file(bucket_name, dest_object_name, source_file_name)
@@ -224,12 +225,26 @@ class S3Handler:
 
 
     def deletedir(self, bucket_name):
+        # Parameter Validation
+        if not self._get(bucket_name):          #check for directory
+            return self._error_messages('non_existent_bucket')
+
         # Delete the bucket only if it is empty
+        try:
+            self.client.delete_bucket(
+                Bucket=bucket_name
+            )
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'BucketNotEmpty':
+                return self._error_messages('bucket_not_empty')
+            else:
+                return ('Failed to delete bucket %s: %s' % (bucket_name, e) )
+            return e
         
         # Success response
-        # operation_successful = ("Deleted bucket %s." % bucket_name)
+        operation_successful = ("Deleted bucket %s." % bucket_name)
         
-        return self._error_messages('not_implemented')
+        return operation_successful
 
 
     def find(self, file_extension, bucket_name=''):
@@ -289,7 +304,9 @@ class S3Handler:
             bucket_name = parts[2]
             response = self.delete(dest_object_name, bucket_name)
         elif parts[0] == 'deletedir':
-            bucket_name = ''
+            if len(parts) < 2:
+                return self._error_messages('incorrect_parameter_number')
+            bucket_name = parts[1]
             response = self.deletedir(bucket_name)
         elif parts[0] == 'find':
             file_extension = ''
