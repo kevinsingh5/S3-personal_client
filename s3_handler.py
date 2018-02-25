@@ -126,14 +126,15 @@ class S3Handler:
         else:
             if not self._get(bucket_name):
                 return self._error_messages('non_existent_bucket')
-        # If bucket_name is provided then display the names of all objects in the bucket
+            # If bucket_name is provided then display the names of all objects in the bucket
             object_list = self.client.list_objects_v2(
                 Bucket=bucket_name
             )
-            #objects = object_list['Name']
+            
             print('Available objects in directory %s:' % bucket_name)
-            for obj in object_list:
-                result.append(object_list['Name'])
+            objects = object_list['Contents']
+            for obj in objects:
+                result.append(obj['Key'])
 
         return ', '.join(result)
 
